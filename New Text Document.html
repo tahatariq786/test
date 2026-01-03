@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pattern Necklace Game</title>
+    <style>
+        /* --- CSS STYLES --- */
+        :root {
+            --red-bead: #FF4136;
+            --blue-bead: #0074D9;
+            --bg-color: #FFFFFF;
+            --string-color: #333;
+            --slot-border: #AAAAAA;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; /* Playful font */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: manipulation; /* Improves touch response */
+        }
+
+        h1 {
+            color: #555;
+            margin: 10px 0;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        /* --- NECKLACE AREA (TOP) --- */
+        #game-area {
+            flex: 2;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* The Cat (Hidden until win) */
+        #cat-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -40%) scale(0);
+            width: 300px;
+            height: 300px;
+            z-index: 1; /* Behind the necklace */
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+        }
+        
+        #cat-container.show {
+            transform: translate(-50%, -40%) scale(1);
+            opacity: 1;
+        }
+
+        /* The String */
+        .necklace-string {
+            position: absolute;
+            width: 90%;
+            height: 6px;
+            background-color: var(--string-color);
+            border-radius: 3px;
+            top: 50%;
+            z-index: 2;
+        }
+
+        /* Container for beads to sit on top of string */
+        .bead-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2vw; /* Responsive gap */
+            z-index: 3;
+            position: relative;
+            width: 100%;
+        }
+
+        .bead {
+            width: 10vw;
+            height: 10vw;
+            max-width: 60px;
+            max-height: 60px;
+            border-radius: 50%;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        /* Bead Colors */
+        .red {
+            background: radial-gradient(circle at 30% 30%, #ff8e85, var(--red-bead));
+        }
+        .blue {
+            background: radial-gradient(circle at 30% 30%, #6eb6ff, var(--blue-bead));
+        }
+
+        /* Empty Slots */
+        .slot {
+            width: 10vw;
+            height: 10vw;
+            max-width: 60px;
+            max-height: 60px;
+            border-radius: 50%;
+            border: 3px dashed var(--slot-border);
+            background-color: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .slot.filled {
+            border: none;
+            background-color: transparent;
+        }
+
+        /* --- CONTROLS AREA (BOTTOM) --- */
+        #controls {
+            flex: 1;
+            width: 100%;
+            background-color: #f0f8ff; /* Light blue tint for control area */
+            border-top: 5px solid #dceefb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            z-index: 10;
+        }
+
+        .control-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            color: white;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+
+        .control-btn.red { background-color: var(--red-bead); }
+        .control-btn.blue { background-color: var(--blue-bead); }
+
+        /* --- ANIMATIONS --- */
+        
+        /* Shake Animation for Wrong Answer */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px) rotate(-5deg); }
+            75% { transform: translateX(10px) rotate(5deg); }
+        }
+        
+        .shake-it {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Flying Bead Animation Class (Added via JS) */
+        .flying-bead {
+            position: fixed;
+            width: 100px; /* Match button size initially */
+            height: 100px;
+            border-radius: 50%;
+            z-index: 100;
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Confetti Canvas */
+        #confetti-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Win Message */
+        #win-message {
+            position: absolute;
+            top: 10%;
+            width: 100%;
+            text-align: center;
+            font-size: 3rem;
+            color: #FFD700;
+            text-shadow: 2px 2px 0 #000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* Reset Button */
+        #reset-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #fff;
+            border: 2px solid #ccc;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Finish the Pattern!</h1>
+    <h1><span style="color: red;">Start with'Red'</span><br>
+<span style="color: blue;"> End with'Blue'</span></h1>
+
+    <div id="game-area">
+        <div id="win-message">YAY!</div>
+        
+        <!-- The Cat SVG (Hidden behind necklace initially) -->
+        <div id="cat-container">
+            <svg viewBox="0 0 200 200" width="100%" height="100%">
+                <!-- Ears -->
+                <path d="M40 60 L60 10 L90 50 Z" fill="#FFA500" stroke="#333" stroke-width="3"/>
+                <path d="M160 60 L140 10 L110 50 Z" fill="#FFA500" stroke="#333" stroke-width="3"/>
+                <!-- Head -->
+                <ellipse cx="100" cy="100" rx="70" ry="60" fill="#FFD700" stroke="#333" stroke-width="3"/>
+                <!-- Eyes -->
+                <circle cx="75" cy="90" r="8" fill="black"/>
+                <circle cx="125" cy="90" r="8" fill="black"/>
+                <circle cx="77" cy="88" r="3" fill="white"/>
+                <circle cx="127" cy="88" r="3" fill="white"/>
+                <!-- Nose -->
+                <path d="M95 105 L105 105 L100 115 Z" fill="pink"/>
+                <!-- Mouth -->
+                <path d="M100 115 Q90 130 80 120" fill="none" stroke="#333" stroke-width="2"/>
+                <path d="M100 115 Q110 130 120 120" fill="none" stroke="#333" stroke-width="2"/>
+                <!-- Whiskers -->
+                <line x1="40" y1="100" x2="10" y2="95" stroke="#333" stroke-width="1"/>
+                <line x1="40" y1="105" x2="10" y2="110" stroke="#333" stroke-width="1"/>
+                <line x1="160" y1="100" x2="190" y2="95" stroke="#333" stroke-width="1"/>
+                <line x1="160" y1="105" x2="190" y2="110" stroke="#333" stroke-width="1"/>
+            </svg>
+        </div>
+
+        <div class="necklace-string"></div>
+        <div class="bead-row">
+            <!-- Empty Slots -->
+            <div class="slot" id="slot-0" data-color="red"></div>
+            <div class="slot" id="slot-1" data-color="blue"></div>
+            <div class="slot" id="slot-2" data-color="red"></div>
+	    <div class="slot" id="slot-3" data-color="blue"></div>
+            <div class="slot" id="slot-4" data-color="red"></div>
+            <div class="slot" id="slot-5" data-color="blue"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div class="control-btn red" id="btn-red" onclick="handleInput('red')"></div>
+        <div class="control-btn blue" id="btn-blue" onclick="handleInput('blue')"></div>
+    </div>
+
+    <button id="reset-btn" onclick="resetGame()">Play Again</button>
+    <canvas id="confetti-canvas"></canvas>
+
+    <script>
+        /* --- GAME LOGIC --- */
+        
+        // Game State
+        const pattern = ['red', 'blue', 'red','blue', 'red','blue'];  // The remaining pattern to complete
+        let currentStep = 0;
+        let isAnimating = false;
+        
+        // Audio Context (created on first interaction)
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Sound Synthesis Functions
+        function playTone(freq, type, duration, slideTo = null) {
+            if (!audioCtx) initAudio();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            if (slideTo) {
+                osc.frequency.linearRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+            }
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playCorrectSound() {
+            playTone(600, 'sine', 0.1);
+            setTimeout(() => playTone(800, 'sine', 0.3), 100);
+        }
+
+        function playWrongSound() {
+            // A "Boing" sound - frequency slides down then up
+            playTone(150, 'sawtooth', 0.4, 100);
+            setTimeout(() => playTone(100, 'sawtooth', 0.4, 200), 200);
+        }
+
+        function playWinSound() {
+            let delay = 0;
+            [523.25, 659.25, 783.99, 1046.50].forEach((note) => {
+                setTimeout(() => playTone(note, 'triangle', 0.3), delay);
+                delay += 150;
+            });
+        }
+
+        // Input Handler
+        function handleInput(color) {
+            initAudio(); // Ensure audio context is ready
+            
+            if (isAnimating || currentStep >= pattern.length) return;
+
+            const correctColor = pattern[currentStep];
+            const buttonId = color === 'red' ? 'btn-red' : 'btn-blue';
+            const buttonElement = document.getElementById(buttonId);
+
+            if (color === correctColor) {
+                // CORRECT
+                isAnimating = true;
+                playCorrectSound();
+                animateBead(buttonElement, color);
+            } else {
+                // WRONG
+                playWrongSound();
+                buttonElement.classList.add('shake-it');
+                setTimeout(() => {
+                    buttonElement.classList.remove('shake-it');
+                }, 400);
+            }
+        }
+
+        // Animate the bead flying
+        function animateBead(sourceBtn, color) {
+            const slot = document.getElementById(`slot-${currentStep}`);
+            
+            // Create a temporary flying bead
+            const flyer = document.createElement('div');
+            flyer.classList.add('bead', color, 'flying-bead');
+            
+            // Get positions
+            const startRect = sourceBtn.getBoundingClientRect();
+            const endRect = slot.getBoundingClientRect();
+
+            // Set initial position (on top of button)
+            flyer.style.left = startRect.left + 'px';
+            flyer.style.top = startRect.top + 'px';
+            flyer.style.width = startRect.width + 'px';
+            flyer.style.height = startRect.height + 'px';
+
+            document.body.appendChild(flyer);
+
+            // Force reflow
+            flyer.offsetWidth;
+
+            // Animate to target
+            flyer.style.left = endRect.left + 'px';
+            flyer.style.top = endRect.top + 'px';
+            flyer.style.width = endRect.width + 'px';
+            flyer.style.height = endRect.height + 'px';
+
+            // When animation ends
+            setTimeout(() => {
+                flyer.remove();
+                
+                // Fill the slot
+                slot.classList.add('filled');
+                slot.innerHTML = `<div class="bead ${color}" style="width:100%; height:100%;"></div>`;
+                
+                currentStep++;
+                isAnimating = false;
+
+                // Check Win
+                if (currentStep >= pattern.length) {
+                    doWinSequence();
+                }
+            }, 500); // Matches transition time
+        }
+
+        function doWinSequence() {
+            setTimeout(() => {
+                playWinSound();
+                document.getElementById('cat-container').classList.add('show');
+                document.getElementById('win-message').style.opacity = 1;
+                document.getElementById('reset-btn').style.display = 'block';
+                startConfetti();
+            }, 300);
+        }
+
+        function resetGame() {
+            currentStep = 0;
+            isAnimating = false;
+            
+            // Reset visual state
+            document.getElementById('cat-container').classList.remove('show');
+            document.getElementById('win-message').style.opacity = 0;
+            document.getElementById('reset-btn').style.display = 'none';
+            stopConfetti();
+
+            // Clear slots
+            for (let i = 0; i < 6; i++){
+                const slot = document.getElementById(`slot-${i}`);
+                slot.classList.remove('filled');
+                slot.innerHTML = '';
+            }
+        }
+
+        /* --- CONFETTI SYSTEM --- */
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        let confettiLoop;
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function startConfetti() {
+            particles = [];
+            for (let i = 0; i < 100; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    color: ['#FF4136', '#0074D9', '#FFDC00', '#2ECC40'][Math.floor(Math.random() * 4)],
+                    size: Math.random() * 10 + 5,
+                    speed: Math.random() * 5 + 2,
+                    wobble: Math.random() * 2 * Math.PI
+                });
+            }
+            animateConfetti();
+        }
+
+        function stopConfetti() {
+            cancelAnimationFrame(confettiLoop);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function animateConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            particles.forEach(p => {
+                p.y += p.speed;
+                p.wobble += 0.1;
+                
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x + Math.sin(p.wobble) * 20, p.y, p.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (p.y > canvas.height) p.y = -20;
+            });
+
+            confettiLoop = requestAnimationFrame(animateConfetti);
+        }
+    </script>
+</body>
+</html>
